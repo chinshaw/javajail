@@ -2,29 +2,25 @@ package org.braindroppings.forkingjava;
 
 public class ForkException extends Exception {
 
-    public ForkException() {
-        super();
-        // TODO Auto-generated constructor stub
-    }
 
-    public ForkException(String arg0, Throwable arg1) {
-        super(arg0, arg1);
-        // TODO Auto-generated constructor stub
-    }
-
-    public ForkException(String arg0) {
-        super(arg0);
-        // TODO Auto-generated constructor stub
-    }
-
-    public ForkException(Throwable arg0) {
-        super(arg0);
-        // TODO Auto-generated constructor stub
-    }
-
-    /**
-     * 
+	/**
+     * Serialization ID.
      */
-    private static final long serialVersionUID = 5498538842730004890L;
+	private static final long serialVersionUID = 5498538842730004890L;
+	
+	public ForkException() {
+		super();
+	}
 
+	public ForkException(String message, Throwable throwable) {
+		super(message, throwable);
+	}
+
+	public ForkException(String message) {
+		super(message);
+	}
+
+	public ForkException(Throwable throwable) {
+		super(throwable);
+	}
 }

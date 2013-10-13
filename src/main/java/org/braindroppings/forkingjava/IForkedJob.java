@@ -4,5 +4,4 @@ import java.io.Serializable;
 
 public interface IForkedJob extends Serializable, Runnable {
 
-	
 }

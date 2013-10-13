@@ -35,266 +35,283 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 
-class ForkServer extends UnicastRemoteObject implements IForkServer, IForkService {
+class ForkServer extends UnicastRemoteObject implements IForkServer,
+		IForkService {
 
-    /**
-     * ForkServer logger
-     */
-    private static final Logger logger = Logger.getLogger(ForkServer.class.getName());
+	/**
+	 * ForkServer logger
+	 */
+	private static final Logger logger = Logger.getLogger(ForkServer.class
+			.getName());
 
-    /**
-     * Number of seconds to wait before contacting client to see if it is still
-     * avlive.
-     */
-    private static final int PING_INTERVAL = 10;
-    
-    
-    /**
-     * This is needed because we want to return from our 
-     * @author chinshaw
-     *
-     */
-    class ShutdownThread extends Thread {
-        
-        public void run() {
-            try {
-                Thread.sleep(PING_INTERVAL * 2000);
-            } catch (InterruptedException e) {
-            }
-            exit(0);
-        }
-    }
-    
-    
+	/**
+	 * Number of seconds to wait before contacting client to see if it is still
+	 * avlive.
+	 */
+	private static final int PING_INTERVAL = 10;
 
-    class PingThread extends Thread {
+	/**
+	 * This is needed because we want to return from our
+	 * 
+	 * @author chinshaw
+	 * 
+	 */
+	class ShutdownThread extends Thread {
 
-        IForkClient pingClient;
+		public void run() {
+			try {
+				Thread.sleep(PING_INTERVAL * 2000);
+			} catch (InterruptedException e) {
+			}
+			exit(0);
+		}
+	}
 
-        public PingThread(IForkClient client) {
-            this.pingClient = client;
-        }
+	class PingThread extends Thread {
 
-        public void run() {
+		IForkClient pingClient;
 
-            while (true) {
-                try {
-                    logger.finest("Doing ping");
-                    pingClient.ping();
-                    Thread.sleep(PING_INTERVAL * 1000);
-                } catch (RemoteException e) {
-                    logger.warning("Calling close on forked server");
-                    exit(0);
-                } catch (InterruptedException e) {
-                    logger.warning("Hmm, caught an interrupted exception");
-                }
-            }
-        }
-    }
+		public PingThread(IForkClient client) {
+			this.pingClient = client;
+		}
 
-    /**
-     * Required for UnicastRemoteObject
-     */
-    private static final long serialVersionUID = -3476634356209948347L;
+		public void run() {
 
-    private static String forkId;
+			while (true) {
+				try {
+					logger.finest("Doing ping");
+					pingClient.ping();
+					Thread.sleep(PING_INTERVAL * 1000);
+				} catch (RemoteException e) {
+					logger.warning("Calling close on forked server");
+					exit(0);
+				} catch (InterruptedException e) {
+					logger.warning("Hmm, caught an interrupted exception");
+				}
+			}
+		}
+	}
 
-    protected ForkServer() throws RemoteException {
-        this(UUID.randomUUID().toString());
-    }
+	/**
+	 * Required for UnicastRemoteObject
+	 */
+	private static final long serialVersionUID = -3476634356209948347L;
 
-    protected ForkServer(String forkId) throws RemoteException {
-        super();
-        ForkServer.forkId = forkId;
-    }
+	private static String forkId;
 
-    public void start() throws AccessException, RemoteException, AlreadyBoundException {
-        String serverId = getIdentifier();
+	protected ForkServer() throws RemoteException {
+		this(UUID.randomUUID().toString());
+	}
 
-        if (System.getSecurityManager() == null) {
-            System.setSecurityManager(new SecurityManager());
-        }
+	protected ForkServer(String forkId) throws RemoteException {
+		super();
+		ForkServer.forkId = forkId;
+	}
 
-        Registry registry = LocateRegistry.getRegistry(Constants.RMI_CONNECTION_PORT);
+	public void start() throws AccessException, RemoteException,
+			AlreadyBoundException {
+		String serverId = getIdentifier();
 
-        registry.bind(serverId, this);
+		if (System.getSecurityManager() == null) {
+			System.setSecurityManager(new SecurityManager());
+		}
 
-        IForkClient client = null;
-        try {
-            client = (IForkClient) LocateRegistry.getRegistry(Constants.RMI_CONNECTION_PORT).lookup(forkId + IForkClient.TYPE_IDENTIFIER);
-            logger.info("Contacting client");
-            client.onServerStarted(serverId);
+		Registry registry = LocateRegistry
+				.getRegistry(Constants.RMI_CONNECTION_PORT);
 
-            new PingThread(client).start();
+		registry.bind(serverId, this);
 
-        } catch (NotBoundException e) {
-            logger.info("Problem binding to client and we are going to die now");
-            exit(-1);
-        }
-    }
+		IForkClient client = null;
+		try {
+			client = (IForkClient) LocateRegistry.getRegistry(
+					Constants.RMI_CONNECTION_PORT).lookup(
+					forkId + IForkClient.TYPE_IDENTIFIER);
+			logger.info("Contacting client");
+			client.onServerStarted(serverId);
 
-    /**
-     * Returns the server identifier, this is a combination
-     * of the client's fork id and the {@link IForkServer#TYPE_IDENTIFIER}
-     * @return Sting representation of the server identifier.
-     */
-    public static String getIdentifier() {
-        return forkId + TYPE_IDENTIFIER;
-    }
+			new PingThread(client).start();
 
-    /**
-     * Starts a forked server process, simply calls new ForkServer and starts
-     * it. The argument for an id is required and it should be the last
-     * argument.
-     * 
-     * @param args
-     *            command line arguments, ignored
-     * @throws Exception
-     *             if the server could not be started
-     */
-    public static void main(String[] args) throws Exception {
-        String generatedId = args[0];
+		} catch (NotBoundException e) {
+			logger.info("Problem binding to client and we are going to die now");
+			exit(-1);
+		}
+	}
 
-        if (generatedId == null) {
-            throw new ForkException("The last argument to the fork server must be a valid uuid identifier");
-        }
+	/**
+	 * Returns the server identifier, this is a combination of the client's fork
+	 * id and the {@link IForkServer#TYPE_IDENTIFIER}
+	 * 
+	 * @return Sting representation of the server identifier.
+	 */
+	public static String getIdentifier() {
+		return forkId + TYPE_IDENTIFIER;
+	}
 
-        try {
-            UUID.fromString(generatedId);
-        } catch (IllegalArgumentException e) {
-            throw new ForkException("Forked server must have a valid uuid to start so that it can bind to client, the id sent was -> " + generatedId, e);
-        }
-        try {
-            new ForkServer(generatedId).start();
-        } catch (Error e) {
-            System.out.println("GOT AN ERROR " + e);
-            throw e;
-        }
+	/**
+	 * Starts a forked server process, simply calls new ForkServer and starts
+	 * it. The argument for an id is required and it should be the last
+	 * argument.
+	 * 
+	 * @param args
+	 *            command line arguments, ignored
+	 * @throws Exception
+	 *             if the server could not be started
+	 */
+	public static void main(String[] args) throws Exception {
+		String generatedId = args[0];
 
-    }
+		if (generatedId == null) {
+			throw new ForkException(
+					"The last argument to the fork server must be a valid uuid identifier");
+		}
 
-    /**
-     * If you get here we will simply return true. The server will close on most
-     * errors so if this returns then you can be pretty sure it is ready to go.
-     */
-    public boolean ping() {
-        return true;
-    }
+		try {
+			UUID.fromString(generatedId);
+		} catch (IllegalArgumentException e) {
+			throw new ForkException(
+					"Forked server must have a valid uuid to start so that it can bind to client, the id sent was -> "
+							+ generatedId, e);
+		}
+		try {
+			new ForkServer(generatedId).start();
+		} catch (Error e) {
+			System.out.println("GOT AN ERROR " + e);
+			throw e;
+		}
 
-    /**
-     * This needs some work, and I don't know if it is a great idea since we can
-     * use callable
-     */
-    public <T extends Serializable> T execute(Class<T> returnType, IForkedJob job) throws RemoteException {
-        System.out.println("About to start");
-        job.run();
-        return null;
-    }
+	}
 
-    /**
-     * This is a stub because it is required by the {@link IForkService}
-     * interface it is required but the client should call it's execute method
-     * with a default timeout, I will not allow you to execute indefinitely, go
-     * make your own server.
-     * 
-     * @see #execute(Callable, int)
-     * @param callable
-     *            Don't even bother we're just throwing an exception
-     */
-    public <T extends Serializable> T execute(RemoteOperation<T> callable) throws ForkException {
-        throw new RuntimeException("You are a mystical wizard with jmp powers!!");
-    }
+	/**
+	 * If you get here we will simply return true. The server will close on most
+	 * errors so if this returns then you can be pretty sure it is ready to go.
+	 */
+	public boolean ping() {
+		return true;
+	}
 
-    /**
-     * This will execute a {@link Callable} job in this process vs the server.
-     * It will attempt to execute for as long as the timer is set for. If the
-     * timout occurrs we will try to kill the job but the client will be in
-     * charge of killing this process or calling close.
-     * 
-     * @parm {@link Callable} operation that will execute as a job on the
-     *       server.
-     * @param timeout
-     *            in seconds to wait for the job to complete.
-     * @return T this is a serializable object that can be returned from the
-     *         server.
-     * @throws ForkTimeoutException
-     */
-    public <T extends Serializable> T execute(RemoteOperation<T> callable, int timeout) throws ForkException, ForkTimeoutException {
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-        Future<T> future = executorService.submit(callable);
+	/**
+	 * This needs some work, and I don't know if it is a great idea since we can
+	 * use callable
+	 */
+	public <T extends Serializable> T execute(Class<T> returnType,
+			IForkedJob job) throws RemoteException {
+		System.out.println("About to start");
+		job.run();
+		return null;
+	}
 
-        T result = null;
-        try {
-            result = future.get(timeout, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            throw new ForkTimeoutException("Your job timed out, it took longer than " + timeout + " seconds to complete", e);
-        } catch (ExecutionException e) {
-            throw new ForkException("Unable to execute task ", e.getCause());
-        } catch (InterruptedException e) {
-            logger.warning("The job was interrupted but what do we do");
-        } catch (Error e) {
-            System.out.println("ERROR OCCURRED " + e);
-            throw new ForkException("Unable to complete execution of task ", e.getCause());
-        }
+	/**
+	 * This is a stub because it is required by the {@link IForkService}
+	 * interface it is required but the client should call it's execute method
+	 * with a default timeout, I will not allow you to execute indefinitely, go
+	 * make your own server.
+	 * 
+	 * @see #execute(Callable, int)
+	 * @param callable
+	 *            Don't even bother we're just throwing an exception
+	 */
+	public <T extends Serializable> T execute(RemoteOperation<T> callable)
+			throws ForkException {
+		throw new RuntimeException(
+				"You are a mystical wizard with jmp powers!!");
+	}
 
-        return result;
-    }
+	/**
+	 * This will execute a {@link Callable} job in this process vs the server.
+	 * It will attempt to execute for as long as the timer is set for. If the
+	 * timout occurrs we will try to kill the job but the client will be in
+	 * charge of killing this process or calling close.
+	 * 
+	 * @parm {@link Callable} operation that will execute as a job on the
+	 *       server.
+	 * @param timeout
+	 *            in seconds to wait for the job to complete.
+	 * @return T this is a serializable object that can be returned from the
+	 *         server.
+	 * @throws ForkTimeoutException
+	 */
+	public <T extends Serializable> T execute(RemoteOperation<T> callable,
+			int timeout) throws ForkException, ForkTimeoutException {
+		ExecutorService executorService = Executors.newSingleThreadExecutor();
+		Future<T> future = executorService.submit(callable);
 
-    /**
-     * Allows us to add a classpath to the class path for this service, this
-     * should be in the form of a url
-     */
-    public void addClassPath(String classPath) throws IOException, RemoteException {
-        ClassPathHacker.addFile(classPath);
-    }
+		T result = null;
+		try {
+			result = future.get(timeout, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			throw new ForkTimeoutException(
+					"Your job timed out, it took longer than " + timeout
+							+ " seconds to complete", e);
+		} catch (ExecutionException e) {
+			throw new ForkException("Unable to execute task ", e.getCause());
+		} catch (InterruptedException e) {
+			logger.warning("The job was interrupted but what do we do");
+		} catch (Error e) {
+			System.out.println("ERROR OCCURRED " + e);
+			throw new ForkException("Unable to complete execution of task ",
+					e.getCause());
+		}
 
-    /**
-     * Close the server essentially calls close.
-     * 
-     * @throws NotBoundException
-     * 
-     * @see IForkService#close()
-     */
-    public void close() {
+		return result;
+	}
 
-        Registry registry;
-        try {
-            registry = LocateRegistry.getRegistry(Constants.RMI_CONNECTION_PORT);
-            registry.unbind(getIdentifier());
-        } catch (Exception e) {
-            // Doesn't matter we're about to die.
-        }
-        
-        new ShutdownThread().start();
-    }
+	/**
+	 * Allows us to add a classpath to the class path for this service, this
+	 * should be in the form of a url
+	 */
+	public void addClassPath(String classPath) throws IOException,
+			RemoteException {
+		ClassPathHacker.addFile(classPath);
+	}
 
-    public long totalMemory() {
-        return Runtime.getRuntime().totalMemory();
-    }
+	/**
+	 * Close the server essentially calls close.
+	 * 
+	 * @throws NotBoundException
+	 * 
+	 * @see IForkService#close()
+	 */
+	public void close() {
 
-    public long maxMemory() {
-        return Runtime.getRuntime().maxMemory();
-    }
+		Registry registry;
+		try {
+			registry = LocateRegistry
+					.getRegistry(Constants.RMI_CONNECTION_PORT);
+			registry.unbind(getIdentifier());
+		} catch (Exception e) {
+			// Doesn't matter we're about to die.
+		}
 
-    public long freeMemory() {
-        return Runtime.getRuntime().freeMemory();
-    }
+		new ShutdownThread().start();
+	}
 
-    /**
-     * Close the forked server.
-     * 
-     * @param exitCode
-     *            The code to exit with.
-     * @throws NotBoundException
-     * @throws RemoteException
-     * @throws AccessException
-     */
-    private void exit(int exitCode) {
-        System.exit(exitCode);
-    }
+	public long totalMemory() {
+		return Runtime.getRuntime().totalMemory();
+	}
 
-    public boolean alive() throws RemoteException {
-        return true;
-    }
+	public long maxMemory() {
+		return Runtime.getRuntime().maxMemory();
+	}
+
+	public long freeMemory() {
+		return Runtime.getRuntime().freeMemory();
+	}
+
+	/**
+	 * Close the forked server.
+	 * 
+	 * @param exitCode
+	 *            The code to exit with.
+	 * @throws NotBoundException
+	 * @throws RemoteException
+	 * @throws AccessException
+	 */
+	private void exit(int exitCode) {
+		System.exit(exitCode);
+	}
+
+	public boolean alive() throws RemoteException {
+		return true;
+	}
 
 }

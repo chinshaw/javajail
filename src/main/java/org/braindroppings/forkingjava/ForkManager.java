@@ -8,47 +8,55 @@ import java.util.Map;
 
 public class ForkManager {
 
-    private static ForkManager instance;
+	private static ForkManager instance;
 
-    private static volatile Registry rmiRegistry = null;
+	private static volatile Registry rmiRegistry = null;
 
-    private ForkManager() {
-        if (System.getSecurityManager() == null) {
-            System.setSecurityManager(new SecurityManager());
-        }
-        
-        try {
-            rmiRegistry = LocateRegistry.createRegistry(Constants.RMI_CONNECTION_PORT);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Terminal unable to create rmi registry ", e);
-        }
-    }
+	private ForkManager() {
+		if (System.getSecurityManager() == null) {
+			System.setSecurityManager(new SecurityManager());
+		}
 
-    public static ForkManager getInstance() {
-        if (instance == null) {
-            instance = new ForkManager();
-        }
-        return instance;
-    }
+		try {
+			rmiRegistry = LocateRegistry
+					.createRegistry(Constants.RMI_CONNECTION_PORT);
+			
+		} catch (RemoteException e) {
+			e.printStackTrace();
+			throw new RuntimeException(
+					"Terminal unable to create rmi registry ", e);
+		}
+	}
 
-    public IForkService getFork() throws IOException, ForkException, BootstrapException {
-        return new ForkClient();
-    }
+	public static ForkManager getInstance() {
+		if (instance == null) {
+			instance = new ForkManager();
+		}
+		return instance;
+	}
 
-    public IForkService getFork(String java) throws RemoteException, ForkException, BootstrapException {
-        return new ForkClient(java);
-    }
+	public IForkService getFork() throws IOException, ForkException,
+			BootstrapException {
+		return new ForkClient();
+	}
 
-    public IForkService getFork(String java, Map<String, String> environment) throws IOException, ForkException, BootstrapException {
-        return new ForkClient(java);
-    }
+	public IForkService getFork(String java) throws RemoteException,
+			ForkException, BootstrapException {
+		return new ForkClient(java);
+	}
 
-    public IForkService getFork(BootstrapBuilder bootstrap, Map<String, String> environment) throws RemoteException, ForkException, BootstrapException {
-        return new ForkClient(bootstrap, environment);
-    }
+	public IForkService getFork(String java, Map<String, String> environment)
+			throws IOException, ForkException, BootstrapException {
+		return new ForkClient(java);
+	}
 
-    public Registry getRmiRegistry() {
-        return rmiRegistry;
-    }
+	public IForkService getFork(BootstrapBuilder bootstrap,
+			Map<String, String> environment) throws RemoteException,
+			ForkException, BootstrapException {
+		return new ForkClient(bootstrap, environment);
+	}
+
+	public Registry getRmiRegistry() {
+		return rmiRegistry;
+	}
 }
